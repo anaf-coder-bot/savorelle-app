@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "Savorelle",
+    "slug": "savorelle_app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "app",
+    "icon": "./assets/images/burger-two.png",
+    "scheme": "savorelle",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -23,14 +23,15 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/burger-two.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -38,7 +39,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
