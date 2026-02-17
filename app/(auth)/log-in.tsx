@@ -1,8 +1,7 @@
 import {View, Text, TextInput, TouchableOpacity} from 'react-native'
-import React, {useEffect, useState} from 'react'
+import React, {useContext, useState} from 'react'
 import { Key } from "lucide-react-native"
-import {check_login, login_user} from "@/function/auth";
-import {router} from "expo-router";
+import { AuthContext } from '@/context/AuthContext';
 
 type Data = {
     username: string;
@@ -12,6 +11,8 @@ type Data = {
 
 const LogIn = () => {
 
+    const { login } = useContext(AuthContext);
+
     const [data, setData] = useState<Data>({
         username: "",
         password: "",
@@ -19,26 +20,37 @@ const LogIn = () => {
     });
     const [loading, setLoading] = useState<boolean>(false);
 
-    useEffect(() => {
-        const check_user_login = async (): Promise<void> => {
-            const res = await check_login();
-            if (res===true) router.replace("/");
-        };
-        check_user_login().catch(error => {console.log(error)})
-    }, []);
-
     const handle_login = async () : Promise<void> => {
         if (!data.username || !data.password || loading) return;
         setLoading(true);
-        const res = await login_user();
-        if (res === 500) setData(prev => ({...prev, error:"Something went wrong, try again."}));
+        try {
+            const req = await fetch(`http://192.168.1.4:3000/auth/login`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({username:data.username, password:data.password, client:"app"}),
+            });
+            const res = await req.json();
+            if (!req.ok) {
+                setData(prev => ({...prev, error:res.msg}));
+            } else {
+                const { accessToken, refreshToken, user }:{accessToken:string, refreshToken:string, user:{username:string, role:string}} = res;
+                login({accessToken, refreshToken, user});
+            };
+        } catch(error) {
+            console.error(error as string);
+            setData(prev => ({...prev, error:"Something went wrong, try again."}));
+        };
+        setLoading(false);
 
     };
 
     return (
         <View className={'flex items-center justify-center gap-3 h-screen p-3 font-quicksand'}>
             <Text className={'font-quicksand-bold text-3xl'}>Welcome to Savorelle</Text>
-            <Text className={'font-gray-400 font-quicksand-lights'}>Login to your account</Text>
+            <Text className={'text-gray-400 font-quicksand-lights'}>Login to your account</Text>
+            <Text className={'text-red-400'}>{data.error}</Text>
             <View className={'border w-full'} />
             <Text className={'font-quicksand-semibold text-xl mt-5'}>Username</Text>
             <TextInput
