@@ -1,108 +1,139 @@
-import {View, Text, FlatList, ActivityIndicator, TouchableOpacity} from 'react-native'
-import React, {useState} from 'react'
-import {SafeAreaView} from "react-native-safe-area-context";
+import React, { useEffect, useState, useRef } from "react";
+import { View, FlatList, ActivityIndicator, Text, TouchableOpacity } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Header from "@/components/Header";
 import OrderItems from "@/components/OrderItems";
 import { LucideRefreshCw } from "lucide-react-native";
+import { connectSocket, socket } from "@/socket/socket"; // your socket instance
+import { useApi } from "@/func/api/api";
 
-type Status = "pending" | "preparing" | "serving" | "paying" | "done" | "delay";
+export type Status = "pending" | "preparing" | "serving" | "paying" | "done";
 
-type Orders = {
-    id: string;
-    customer_name: string;
-    table_no: number;
-    status: Status;
-    items: string[];
-    price: number;
-    tip: number;
-    cash: boolean;
+export type Order = {
+  id: string;
+  customer_name: string;
+  table_no: string | number;
+  status: Status;
+  items: { name: string; quantity: number }[];
+  price: number;
+  tip?: number;
+  cash?: boolean;
 };
 
-export default function Index() {
+export default function WaiterOrders() {
+  const { request } = useApi();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [serverMsg, setServerMsg] = useState<string>("");
+  const loadingRef = useRef(false);
 
-    const [data, setData] = useState<Record<string, Orders>>({
-        "123": {
-            id: "123",
-            table_no: 123,
-            cash: false,
-            price: 10000,
-            status: "pending",
-            items: ["chicken", "burger", "pizza", "coffe"],
-            tip: 0,
-            customer_name: "Anaf"
-        },
-        "234": {
-            id: "234",
-            table_no: 123,
-            cash: false,
-            price: 10000,
-            status: "preparing",
-            items: ["chicken", "burger", "pizza", "coffe"],
-            tip: 0,
-            customer_name: "Anaf"
-        },
-        "345": {
-            id: "345",
-            table_no: 123,
-            cash: false,
-            price: 10000,
-            status: "serving",
-            items: ["chicken", "burger", "pizza", "coffe"],
-            tip: 0,
-            customer_name: "Anaf"
-        },
-        "456": {
-            id: "456",
-            table_no: 123,
-            cash: false,
-            price: 10000,
-            status: "paying",
-            items: ["chicken", "burger", "pizza", "coffe"],
-            tip: 0,
-            customer_name: "Anaf"
-        },
-        "567": {
-            id: "567",
-            table_no: 123,
-            cash: false,
-            price: 10000,
-            status: "done",
-            items: ["chicken", "burger", "pizza", "coffe"],
-            tip: 0,
-            customer_name: "Anaf"
-        },
+    useEffect(() => {
+    getOrders();
+    const initSocket = async () => {
+    const s = await connectSocket(); // wait for username
+    s.connect(); // now connect safely
+    s.emit("join-waiter");
+
+    s.on("new-order", (order: Order) => {
+        console.log("NEW ORDER")
+        setOrders(prev => [order, ...prev]);
     });
 
-    const [loading, setLoading] = useState<boolean>(false);
-    const [serverMsg, setServerMsg] = useState<string>("");
-    const [updatedId, setUpdatedId] = useState<string>("");
-
-    const get_data = async () => {
-        if (loading) return;
-        setLoading(true);
+    s.on("order-updated", (updatedOrder: Order) => {
+        setOrders(prev =>
+        prev.map(o => (o.id === updatedOrder.id ? {...o, status:updatedOrder.status} : o)).filter(o => o.status !== "done")
+        );
+    });
     };
 
-    return (
-        <SafeAreaView>
-            <FlatList
-                data={Object.values(data).sort(a => a.id===updatedId?-1:0)}
-                keyExtractor={item => item.id}
-                renderItem={({ item }) => <OrderItems id={item.id} customer_name={item.customer_name}
-                                                      table_no={item.table_no} status={item.status}
-                                                      items={item.items} price={item.price}
-                                                      tip={item.tip} cash={item.cash} setData={setData}/>}
-                ListHeaderComponent={() => <Header name={"anaf"}/>}
-                ListEmptyComponent={() =>loading ? <ActivityIndicator size={50} color={"black"} /> : (
-                        <View className={'items-center justify-center gap-5 p-5'}>
-                            <Text>{serverMsg || "Try again."}</Text>
-                            <TouchableOpacity className={'flex-row items-center justify-center gap-5 bg-black p-3 rounded-full'} onPress={get_data}>
-                                <Text className={'text-white'}>Try again</Text>
-                                <LucideRefreshCw color={'white'} />
-                            </TouchableOpacity>
-                        </View>
-                    )}
-                contentContainerClassName={'px-4 pb-10 gap-5'}
-            />
-        </SafeAreaView>
-    )
+    initSocket();
+
+    return () => {
+    if (socket) {
+        socket.off("new-order");
+        socket.off("order-updated");
+        socket.disconnect();
+    }
+    };
+    }, []);
+
+
+  // Fetch orders
+  const getOrders = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const req = await request("/waiter/get-order"); // change to your API
+      if (!req.ok || req.error) {
+        
+        const res = await req.json().catch(() => ({}));
+        setServerMsg(req.error || res.msg || "Failed to fetch orders");
+      } else {
+        const res = await req.json();
+        setOrders(res.order);
+      }
+    } catch (err: any) {
+      setServerMsg(err.message || "Error fetching orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update status
+  const handleStatusUpdate = async (id: string, status: Status) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    try {
+      const req = await request("/waiter/update-status", {
+        method: "POST",
+        body: JSON.stringify({ id, status }),
+      });
+
+      if (!req.ok || req.error) {
+        const res = await req.json().catch(() => ({}));
+        setServerMsg(req.error || res.msg || "Failed to update order");
+      } else {
+        const res = await req.json();
+        const updatedOrder: Order = res.order;
+        setOrders(prev =>
+          prev.map(o => (o.id === id ? updatedOrder : o)).filter(o => o.status !== "done")
+        );
+      }
+    } catch (err: any) {
+      setServerMsg(err.message || "Error updating order");
+    } finally {
+      loadingRef.current = false;
+    }
+  };
+
+
+  return (
+    <SafeAreaView className="flex-1 bg-white">
+      <FlatList
+        data={orders}
+        keyExtractor={item => item.id}
+        ListHeaderComponent={() => <Header name="Anaf" />}
+        ListEmptyComponent={() =>
+          loading ? (
+            <ActivityIndicator size={50} color="black" />
+          ) : (
+            <View className="items-center justify-center gap-5 p-5">
+              <Text>{serverMsg || "No orders. Try again."}</Text>
+              <TouchableOpacity
+                className="flex-row items-center justify-center gap-5 bg-black p-3 rounded-full"
+                onPress={getOrders}
+              >
+                <Text className="text-white">Try again</Text>
+                <LucideRefreshCw color="white" />
+              </TouchableOpacity>
+            </View>
+          )
+        }
+        renderItem={({ item }) => (
+          <OrderItems order={item} setOrders={setOrders} handleStatusUpdate={handleStatusUpdate} />
+        )}
+        contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 16 }}
+      />
+    </SafeAreaView>
+  );
 }
