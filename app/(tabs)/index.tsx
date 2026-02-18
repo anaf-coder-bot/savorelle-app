@@ -96,7 +96,7 @@ export default function WaiterOrders() {
         const res = await req.json();
         const updatedOrder: Order = res.order;
         setOrders(prev =>
-          prev.map(o => (o.id === id ? updatedOrder : o)).filter(o => o.status !== "done")
+          prev.map(o => (o.id === id ? updatedOrder : o))
         );
       }
     } catch (err: any) {

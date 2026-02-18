@@ -22,7 +22,7 @@ export default function OrderItems({ order, handleStatusUpdate }: OrderItemsProp
 
   const handleServing = async () => {
     setLoading(true);
-    await handleStatusUpdate(order.id, "done");
+    await handleStatusUpdate(order.id, "paying");
     setLoading(false);
   };
 
@@ -83,12 +83,12 @@ export default function OrderItems({ order, handleStatusUpdate }: OrderItemsProp
         </TouchableOpacity>
       )}
 
-      {order.status === "done" && (
+      {/* {order.status === "done" && (
         <View>
           <Text className="font-bold text-lg">Payment Method: {order.cash ? "Cash" : "System"}</Text>
           {!!order.tip && <Text>Tip: {order.tip} ETB</Text>}
         </View>
-      )}
+      )} */}
     </View>
   );
 }
