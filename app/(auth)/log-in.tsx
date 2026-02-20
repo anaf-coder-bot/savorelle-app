@@ -24,7 +24,7 @@ const LogIn = () => {
         if (!data.username || !data.password || loading) return;
         setLoading(true);
         try {
-            const req = await fetch(`http://192.168.1.4:3000/auth/login`, {
+            const req = await fetch(`http://192.168.1.6:3000/auth/login`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

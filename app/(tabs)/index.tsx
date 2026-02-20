@@ -4,8 +4,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Header from "@/components/Header";
 import OrderItems from "@/components/OrderItems";
 import { LucideRefreshCw } from "lucide-react-native";
-import { connectSocket, socket } from "@/socket/socket"; // your socket instance
+import { connectSocket, socket } from "@/socket/socket";
 import { useApi } from "@/func/api/api";
+import { playSound } from "@/components/PlayNotification";
 
 export type Status = "pending" | "preparing" | "serving" | "paying" | "done";
 
@@ -28,42 +29,42 @@ export default function WaiterOrders() {
   const loadingRef = useRef(false);
 
     useEffect(() => {
-    getOrders();
-    const initSocket = async () => {
-    const s = await connectSocket(); // wait for username
-    s.connect(); // now connect safely
-    s.emit("join-waiter");
+      getOrders();
+      const initSocket = async () => {
+      const s = await connectSocket(); 
+      s.connect();
+      s.emit("join-waiter");
 
-    s.on("new-order", (order: Order) => {
-        console.log("NEW ORDER")
-        setOrders(prev => [order, ...prev]);
-    });
+      s.on("new-order", (order: Order) => {
+          setOrders(prev => [order, ...prev]);
+      });
 
-    s.on("order-updated", (updatedOrder: Order) => {
-        setOrders(prev =>
-        prev.map(o => (o.id === updatedOrder.id ? {...o, status:updatedOrder.status} : o)).filter(o => o.status !== "done")
-        );
-    });
-    };
+      s.on("order-updated", (updatedOrder: Order) => {
+          setOrders(prev =>
+          prev.map(o => (o.id === updatedOrder.id ? {...o, status:updatedOrder.status} : o)).filter(o => o.status !== "done")
+          );
+          if (updatedOrder.status==="serving")
+            playSound();
+      });
+      };
 
-    initSocket();
+      initSocket();
 
-    return () => {
-    if (socket) {
-        socket.off("new-order");
-        socket.off("order-updated");
-        socket.disconnect();
-    }
-    };
+      return () => {
+        if (socket) {
+            socket.off("new-order");
+            socket.off("order-updated");
+            socket.disconnect();
+        }
+      };
     }, []);
 
 
-  // Fetch orders
   const getOrders = async () => {
     if (loading) return;
     setLoading(true);
     try {
-      const req = await request("/waiter/get-order"); // change to your API
+      const req = await request("/waiter/get-order");
       if (!req.ok || req.error) {
         
         const res = await req.json().catch(() => ({}));
@@ -79,7 +80,6 @@ export default function WaiterOrders() {
     }
   };
 
-  // Update status
   const handleStatusUpdate = async (id: string, status: Status) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -112,7 +112,7 @@ export default function WaiterOrders() {
       <FlatList
         data={orders}
         keyExtractor={item => item.id}
-        ListHeaderComponent={() => <Header name="Anaf" />}
+        ListHeaderComponent={() => <Header />}
         ListEmptyComponent={() =>
           loading ? (
             <ActivityIndicator size={50} color="black" />

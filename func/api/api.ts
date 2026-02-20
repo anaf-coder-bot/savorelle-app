@@ -9,7 +9,7 @@ export type ApiResponse<T> = {
   json: () => Promise<T>;
 };
 
-export function useApi(baseURL: string = "http://192.168.1.4:3000") {
+export function useApi(baseURL: string = "http://192.168.1.6:3000") {
   // Core request
   const request = async <T = any>(
     endpoint: string,
